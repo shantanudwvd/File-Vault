@@ -1,6 +1,6 @@
 # Abnormal File Vault
 
-A full-stack file management application built with React and Django, designed for efficient file handling and storage.
+A full-stack file management application built with React and Django, designed for efficient file handling and storage with built-in deduplication and intelligent search capabilities.
 
 ## 🚀 Technology Stack
 
@@ -22,12 +22,22 @@ A full-stack file management application built with React and Django, designed f
 - Docker and Docker Compose
 - Local file storage with volume mounting
 
-## 📋 Prerequisites
+## 📋 Key Features
 
-Before you begin, ensure you have installed:
-- Docker (20.10.x or higher) and Docker Compose (2.x or higher)
-- Node.js (18.x or higher) - for local development
-- Python (3.9 or higher) - for local development
+### File Deduplication System
+- Identifies duplicate files at upload time using content hashing
+- Stores only unique files while maintaining references for duplicates
+- Displays storage efficiency metrics and space savings
+- Visual indicators for duplicate files
+
+### Search & Filtering System
+- Search files by filename
+- Filter files by:
+  - File type (with dynamically generated options)
+  - Size range (predefined options like small, medium, large)
+  - Upload date (custom date range selection)
+- Multiple filters can be applied simultaneously
+- Visual indicators for active filters
 
 ## 🛠️ Installation & Setup
 
@@ -98,12 +108,19 @@ docker-compose up --build
 - **GET** `/api/files/`
 - Returns a list of all uploaded files
 - Response includes file metadata (name, size, type, upload date)
+- Supports filtering via query parameters:
+  - `filename`: Search by filename (case-insensitive)
+  - `file_type`: Filter by file type
+  - `min_size`: Minimum file size in bytes
+  - `max_size`: Maximum file size in bytes
+  - `date_from`: Filter files uploaded on or after this date (YYYY-MM-DD)
+  - `date_to`: Filter files uploaded on or before this date (YYYY-MM-DD)
 
 #### Upload File
 - **POST** `/api/files/`
 - Upload a new file
 - Request: Multipart form data with 'file' field
-- Returns: File metadata including ID and upload status
+- Returns: File metadata including ID, upload status, and deduplication info
 
 #### Get File Details
 - **GET** `/api/files/<file_id>/`
@@ -115,13 +132,30 @@ docker-compose up --build
 - Remove a file from the system
 - Returns: 204 No Content on success
 
+#### Get File Types
+- **GET** `/api/files/file_types/`
+- Returns a list of all unique file types in the system
+- Used for populating the file type filter options
+
+#### Get Storage Statistics
+- **GET** `/api/files/storage_stats/`
+- Returns statistics about storage efficiency
+- Includes:
+  - Total files count
+  - Unique files count
+  - Duplicate files count
+  - Total size of all files
+  - Actual storage used
+  - Storage saved through deduplication
+  - Efficiency percentage
+
 #### Download File
 - Access file directly through the file URL provided in metadata
 
 ## 🗄️ Project Structure
 
 ```
-file-hub/
+file-vault/
 ├── backend/                # Django backend
 │   ├── files/             # Main application
 │   │   ├── models.py      # Data models
@@ -165,6 +199,13 @@ file-hub/
    # Reset database
    rm backend/data/db.sqlite3
    python manage.py migrate
+   ```
+
+4. **Data directory permissions**
+   ```bash
+   # If you encounter database access issues
+   mkdir -p backend/data
+   chmod 755 backend/data
    ```
 
 # Project Submission Instructions
@@ -223,4 +264,3 @@ file-hub/
    - Any additional notes or comments about your implementation
 
 Make sure to test the zip file and video before submitting to ensure they are complete and working as expected.
-
