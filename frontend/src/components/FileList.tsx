@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { fileService } from '../services/fileService';
 import { File as FileType } from '../types/file';
+import { FileFilters } from '../types/filterTypes';
 import { DocumentIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SearchBar } from './SearchBar';
+import { FilterPanel } from './FilterPanel';
 
 export const FileList: React.FC = () => {
   const queryClient = useQueryClient();
+  const [filters, setFilters] = useState<FileFilters>({});
 
-  // Query for fetching files
+  // Query for fetching files with filters
   const { data: files, isLoading, error } = useQuery({
-    queryKey: ['files'],
-    queryFn: fileService.getFiles,
+    queryKey: ['files', filters],
+    queryFn: () => fileService.getFiles(filters),
   });
 
   // Mutation for deleting files
@@ -41,6 +45,25 @@ export const FileList: React.FC = () => {
     } catch (err) {
       console.error('Download error:', err);
     }
+  };
+
+  const handleSearch = (searchTerm: string) => {
+    setFilters(prev => ({ ...prev, filename: searchTerm || undefined }));
+  };
+
+  const handleFilterChange = (newFilters: FileFilters) => {
+    setFilters(newFilters);
+  };
+
+  // Format bytes to human-readable format
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   if (isLoading) {
@@ -88,34 +111,57 @@ export const FileList: React.FC = () => {
   return (
     <div className="p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">Uploaded Files</h2>
+
+      <div className="mb-6 space-y-4">
+        <SearchBar onSearch={handleSearch} />
+        <FilterPanel onFilterChange={handleFilterChange} currentFilters={filters} />
+      </div>
+
       {!files || files.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-12 bg-white rounded-lg shadow">
           <DocumentIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No files</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No files found</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Get started by uploading a file
+            {Object.keys(filters).length > 0
+              ? 'Try adjusting your search or filters'
+              : 'Get started by uploading a file'}
           </p>
         </div>
       ) : (
-        <div className="mt-6 flow-root">
-          <ul className="-my-5 divide-y divide-gray-200">
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          <ul className="divide-y divide-gray-200">
             {files.map((file) => (
-              <li key={file.id} className="py-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <DocumentIcon className="h-8 w-8 text-gray-400" />
+              <li key={file.id} className="px-4 py-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <DocumentIcon className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <div className="ml-4">
+                      <h4 className="text-lg font-medium text-gray-900">
+                        {file.original_filename}
+                      </h4>
+                      <div className="mt-1 flex items-center text-sm text-gray-500">
+                        <span className="mr-2">{file.file_type}</span>
+                        <span className="mx-2">•</span>
+                        <span>{formatBytes(file.size)}</span>
+                        <span className="mx-2">•</span>
+                        <span>Uploaded {new Date(file.uploaded_at).toLocaleString()}</span>
+                      </div>
+
+                      {file.is_duplicate && (
+                        <div className="mt-1 flex items-center">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Duplicate
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            {formatBytes(file.storage_saved)} saved
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {file.original_filename}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {file.file_type} • {(file.size / 1024).toFixed(2)} KB
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Uploaded {new Date(file.uploaded_at).toLocaleString()}
-                    </p>
-                  </div>
+
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleDownload(file.file, file.original_filename)}
@@ -142,4 +188,4 @@ export const FileList: React.FC = () => {
       )}
     </div>
   );
-}; 
+};

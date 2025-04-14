@@ -1,8 +1,10 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.db.models import Sum
+from django.db.models import Sum, Q
+from django.utils.dateparse import parse_date
+from datetime import datetime, timedelta
 from .models import File, compute_file_hash
 from .serializers import FileSerializer
 
@@ -10,6 +12,61 @@ from .serializers import FileSerializer
 class FileViewSet(viewsets.ModelViewSet):
     queryset = File.objects.all()
     serializer_class = FileSerializer
+
+    def get_queryset(self):
+        queryset = File.objects.all()
+
+        # Search by filename
+        filename = self.request.query_params.get('filename', None)
+        if filename:
+            queryset = queryset.filter(original_filename__icontains=filename)
+
+        # Filter by file type
+        file_type = self.request.query_params.get('file_type', None)
+        if file_type:
+            queryset = queryset.filter(file_type__icontains=file_type)
+
+        # Filter by size range
+        min_size = self.request.query_params.get('min_size', None)
+        max_size = self.request.query_params.get('max_size', None)
+
+        if min_size:
+            try:
+                min_size = int(min_size)
+                queryset = queryset.filter(size__gte=min_size)
+            except ValueError:
+                pass
+
+        if max_size:
+            try:
+                max_size = int(max_size)
+                queryset = queryset.filter(size__lte=max_size)
+            except ValueError:
+                pass
+
+        # Filter by upload date
+        date_from = self.request.query_params.get('date_from', None)
+        date_to = self.request.query_params.get('date_to', None)
+
+        if date_from:
+            try:
+                date_from = parse_date(date_from)
+                if date_from:
+                    queryset = queryset.filter(uploaded_at__date__gte=date_from)
+            except Exception:
+                pass
+
+        if date_to:
+            try:
+                date_to = parse_date(date_to)
+                if date_to:
+                    # Add one day to include the end date
+                    date_to = date_to + timedelta(days=1)
+                    queryset = queryset.filter(uploaded_at__date__lt=date_to)
+            except Exception:
+                pass
+
+        return queryset
 
     def create(self, request, *args, **kwargs):
         file_obj = request.FILES.get('file')
@@ -84,3 +141,11 @@ class FileViewSet(viewsets.ModelViewSet):
             'saved_storage_bytes': saved_storage,
             'efficiency_percentage': round(efficiency_percentage, 2)
         })
+
+    @action(detail=False, methods=['get'])
+    def file_types(self, request):
+        """
+        Return a list of all file types in the system for filtering.
+        """
+        file_types = File.objects.values_list('file_type', flat=True).distinct()
+        return Response(list(file_types))
